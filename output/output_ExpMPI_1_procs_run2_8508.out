@@ -1,0 +1,56 @@
+Sender: LSF System <lsfadmin@node4.kepler.hpc.local>
+Subject: Job 8508: <ExpMPI_1_procs_run2> in cluster <kepler.lsf.hpc.local> Done
+
+Job <ExpMPI_1_procs_run2> was submitted from host <mgr.kepler.hpc.local> by user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Sat May 10 22:44:13 2025
+Job was executed on host(s) <node4.kepler.hpc.local>, in queue <normal>, as user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Sat May 10 22:44:14 2025
+</home/malkovsin.gmail.com> was used as the home directory.
+</home/malkovsin.gmail.com/Documents/lab3> was used as the working directory.
+Started at Sat May 10 22:44:14 2025
+Terminated at Sat May 10 22:44:54 2025
+Results reported at Sat May 10 22:44:54 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J ExpMPI_1_procs_run2
+#BSUB -W 00:05
+#BSUB -n 1
+#BSUB -R "span[ptile=1]"
+#BSUB -o logs/output_ExpMPI_1_procs_run2_%J.out
+#BSUB -e logs/error_ExpMPI_1_procs_run2_%J.err
+#BSUB -M 512MB
+
+module load mpi/openmpi-x86_64
+mpirun --bind-to core --map-by core ./exp_mpi
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   25.53 sec.
+    Max Memory :                                 901 MB
+    Average Memory :                             487.29 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              20
+    Max Threads :                                88
+    Run time :                                   34 sec.
+    Turnaround time :                            41 sec.
+
+The output (if any) follows:
+
+Matrix size: 100x100
+Number of terms: 10000
+Number of processes: 16
+Execution time: 12.751625 seconds
+
+
+PS:
+
+Read file <logs/error_ExpMPI_1_procs_run2_8508.err> for stderr output of this job.
+
