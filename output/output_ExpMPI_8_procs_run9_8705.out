@@ -1,0 +1,68 @@
+Sender: LSF System <lsfadmin@node4.kepler.hpc.local>
+Subject: Job 8705: <ExpMPI_8_procs_run9> in cluster <kepler.lsf.hpc.local> Done
+
+Job <ExpMPI_8_procs_run9> was submitted from host <mgr.kepler.hpc.local> by user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Mon May 12 20:33:20 2025
+Job was executed on host(s) <8*node4.kepler.hpc.local>, in queue <normal>, as user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Mon May 12 20:33:45 2025
+</home/malkovsin.gmail.com> was used as the home directory.
+</home/malkovsin.gmail.com/Documents/lab3> was used as the working directory.
+Started at Mon May 12 20:33:45 2025
+Terminated at Mon May 12 20:33:55 2025
+Results reported at Mon May 12 20:33:55 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J ExpMPI_8_procs_run9
+#BSUB -W 00:10
+#BSUB -n 8
+#BSUB -R "span[ptile=8]"
+#BSUB -o logs/output_ExpMPI_8_procs_run9_%J.out
+#BSUB -e logs/error_ExpMPI_8_procs_run9_%J.err
+#BSUB -M 1GB
+
+module load mpi/openmpi-x86_64
+mpirun --bind-to core --map-by core ./exp_mpi
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   7.72 sec.
+    Max Memory :                                 51 MB
+    Average Memory :                             34.33 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              20
+    Max Threads :                                56
+    Run time :                                   10 sec.
+    Turnaround time :                            35 sec.
+
+The output (if any) follows:
+
+Matrix size: 3x3
+Number of terms: 1000 (+ Identity)
+Number of processes: 16
+Matrix: A (Initial) (3x3)
+  [  0.1000   0.4000   0.2000 ]
+  [  0.3000   0.0000   0.5000 ]
+  [  0.6000   0.2000   0.1000 ]
+
+Starting calculation...
+Calculation finished.
+Execution time: 0.002423 seconds
+Matrix: e^A (Result) (3x3)
+  [  1.2638   0.4696   0.3450 ]
+  [  0.5010   1.1409   0.5925 ]
+  [  0.7374   0.3560   1.2528 ]
+
+
+
+PS:
+
+Read file <logs/error_ExpMPI_8_procs_run9_8705.err> for stderr output of this job.
+
