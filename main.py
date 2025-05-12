@@ -1,13 +1,13 @@
+import os
 import re
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import pandas as pd
 
 
 def parse_output_file(filename):
-    """Парсит файл вывода и извлекает количество процессов и время выполнения"""
-    # Извлекаем количество процессов из имени файла
     procs_match = re.search(r'output_ExpMPI_(\d+)_procs_run', filename)
     if not procs_match:
         return None
@@ -17,19 +17,14 @@ def parse_output_file(filename):
     with open(filename, 'r') as f:
         content = f.read()
 
-        # Ищем время выполнения
-        time_match = re.search(r'Execution time:\s+([\d.]+)', content)
-        if not time_match:
-            return None
+    time_match = re.search(r'Execution time:\s+([\d.]+)', content)
+    if not time_match:
+        return None
 
-        return {
-            'processes': procs,
-            'time': float(time_match.group(1))
-        }
+    return {'processes': procs, 'time': float(time_match.group(1))}
 
 
 def collect_data(directory='output'):
-    """Собирает данные из всех файлов output в указанной директории"""
     data = defaultdict(list)
     pattern = f"{directory}/output_ExpMPI_*_procs_run*_*.out"
 
@@ -42,81 +37,95 @@ def collect_data(directory='output'):
 
 
 def calculate_stats(data):
-    """Вычисляет среднее время и стандартное отклонение для каждого количества процессов"""
     procs = sorted(data.keys())
     avg_times = [np.mean(data[p]) for p in procs]
     std_times = [np.std(data[p]) for p in procs]
-    return procs, avg_times, std_times
+    min_times = [np.min(data[p]) for p in procs]
+    max_times = [np.max(data[p]) for p in procs]
+    return procs, avg_times, std_times, min_times, max_times
 
 
-def plot_results(procs, avg_times, std_times):
-    """Строит графики времени выполнения, ускорения и эффективности"""
-    # Конвертируем в массивы numpy для удобства вычислений
+def plot_results(procs, avg_times, min_times, max_times):
     procs = np.array(procs)
     avg_times = np.array(avg_times)
-    std_times = np.array(std_times)
+    min_times = np.array(min_times)
+    max_times = np.array(max_times)
 
-    # Находим минимальное количество процессов (будем считать его базовым)
     base_proc = min(procs)
     base_idx = np.where(procs == base_proc)[0][0]
     base_time = avg_times[base_idx]
 
-    # Вычисляем ускорение и эффективность
     speedup = base_time / avg_times
     efficiency = speedup / procs
 
-    # Создаем фигуру с тремя подграфиками
+    os.makedirs('results', exist_ok=True)
+
     plt.figure(figsize=(15, 5))
 
-    # График времени выполнения
+
     plt.subplot(1, 3, 1)
-    plt.errorbar(procs, avg_times, yerr=std_times, fmt='-o', capsize=5)
+    error_lower = avg_times - min_times
+    error_upper = max_times - avg_times
+    plt.errorbar(procs, avg_times, yerr=[error_lower, error_upper], fmt='-o', capsize=5)
     plt.xlabel('Number of processes')
     plt.ylabel('Execution time (s)')
     plt.title(f'Execution Time vs Number of Processes\n(Baseline: {base_proc} process(es))')
     plt.grid(True)
 
-    # График ускорения
     plt.subplot(1, 3, 2)
     plt.plot(procs, speedup, 'b-o', label='Actual speedup')
     plt.plot(procs, procs, 'r--', label='Linear speedup')
     plt.xlabel('Number of processes')
     plt.ylabel('Speedup (T1 / Tp)')
-    plt.title(f'Speedup vs Number of Processes\n(Relative to {base_proc} process(es))')
+    plt.title('Speedup')
     plt.legend()
     plt.grid(True)
 
-    # График эффективности
     plt.subplot(1, 3, 3)
     plt.plot(procs, efficiency, 'g-o')
     plt.xlabel('Number of processes')
     plt.ylabel('Efficiency (S/p)')
-    plt.title(f'Efficiency vs Number of Processes\n(Relative to {base_proc} process(es))')
+    plt.title('Efficiency')
     plt.grid(True)
 
     plt.tight_layout()
-    plt.savefig('parallel_performance.png')
+    plt.savefig('results/parallel_performance.png')
     plt.show()
+
+    return speedup, efficiency
+
+
+def save_to_excel(procs, avg_times, std_times, min_times, max_times, speedup, efficiency):
+    df = pd.DataFrame({
+        'Processes': procs,
+        'Avg Time (s)': avg_times,
+        'Std Time (s)': std_times,
+        'Min Time (s)': min_times,
+        'Max Time (s)': max_times,
+        'Speedup': speedup,
+        'Efficiency': efficiency
+    })
+    df.to_excel('results/metrics.xlsx', index=False)
+    print("Excel файл сохранен в results/metrics.xlsx")
 
 
 def main():
-    # Собираем данные из файлов вывода
     data = collect_data()
 
     if not data:
         print("No valid data found in output files.")
         return
 
-    # Вычисляем статистику
-    procs, avg_times, std_times = calculate_stats(data)
+    procs, avg_times, std_times, min_times, max_times = calculate_stats(data)
 
-    # Выводим собранные данные для проверки
     print("Collected data:")
-    for p in sorted(data.keys()):
-        print(f"Processes: {p}, Runs: {len(data[p])}, Avg: {np.mean(data[p]):.4f} ± {np.std(data[p]):.4f}")
+    for i, p in enumerate(procs):
+        print(f"Processes: {p}, Runs: {len(data[p])}, "
+              f"Avg: {avg_times[i]:.4f} ± {std_times[i]:.4f}, "
+              f"Min: {min_times[i]:.4f}, Max: {max_times[i]:.4f}")
 
-    # Строим графики
-    plot_results(procs, avg_times, std_times)
+    speedup, efficiency = plot_results(procs, avg_times, std_times, min_times, max_times)
+    save_to_excel(procs, avg_times, std_times, min_times, max_times, speedup, efficiency)
 
 
 if __name__ == '__main__':
