@@ -123,7 +123,6 @@ int main(int argc, char** argv) {
         printf("Number of terms: %d (+ Identity)\n", TERMS);
         printf("Number of processes: %d\n", size);
 
-        // Фиксированная инициализация матрицы A
         A[0][0] = 0.1; A[0][1] = 0.4; A[0][2] = 0.2;
         A[1][0] = 0.3; A[1][1] = 0.0; A[1][2] = 0.5;
         A[2][0] = 0.6; A[2][1] = 0.2; A[2][2] = 0.1;
@@ -171,14 +170,6 @@ int main(int argc, char** argv) {
         printf("Execution time: %.6f seconds\n", total_time);
 
         print_matrix("e^A (Result)", result, N);
-
-        FILE* fp = fopen("timings.txt", "a");
-        if (fp != NULL) {
-            fprintf(fp, "%d %.6f\n", size, total_time);
-            fclose(fp);
-        } else {
-            perror("Failed to open timings.txt for appending");
-        }
     }
 
     free_matrix(A, N);

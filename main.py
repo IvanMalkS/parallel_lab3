@@ -8,11 +8,20 @@ import pandas as pd
 
 
 def parse_output_file(filename):
-    procs_match = re.search(r'output_ExpMPI_(\d+)_procs_run', filename)
-    if not procs_match:
+    tech_type = None
+    procs = None
+    
+    mpi_match = re.search(r'output_(MPI|ExpMPI)_(\d+)_(procs|threads)_run', filename)
+    omp_match = re.search(r'output_OMP_(\d+)_threads_run', filename)
+    
+    if mpi_match:
+        tech_type = 'MPI'
+        procs = int(mpi_match.group(2))
+    elif omp_match:
+        tech_type = 'OpenMP'
+        procs = int(omp_match.group(1))
+    else:
         return None
-
-    procs = int(procs_match.group(1))
 
     with open(filename, 'r') as f:
         content = f.read()
@@ -21,92 +30,131 @@ def parse_output_file(filename):
     if not time_match:
         return None
 
-    return {'processes': procs, 'time': float(time_match.group(1))}
+    return {
+        'technology': tech_type,
+        'processes': procs,
+        'time': float(time_match.group(1))
+    }
 
 
-def collect_data(directory='output'):
-    data = defaultdict(list)
-    pattern = f"{directory}/output_ExpMPI_*_procs_run*_*.out"
+def collect_data(directory='logs'):
+    data = defaultdict(lambda: defaultdict(list))
+    pattern = f"{directory}/output_*.out"
 
     for filename in glob.glob(pattern):
         result = parse_output_file(filename)
         if result:
-            data[result['processes']].append(result['time'])
+            data[result['technology']][result['processes']].append(result['time'])
 
     return data
 
 
 def calculate_stats(data):
-    procs = sorted(data.keys())
-    avg_times = [np.mean(data[p]) for p in procs]
-    std_times = [np.std(data[p]) for p in procs]
-    min_times = [np.min(data[p]) for p in procs]
-    max_times = [np.max(data[p]) for p in procs]
-    return procs, avg_times, std_times, min_times, max_times
+    stats = {}
+    for tech in data:
+        procs = sorted(data[tech].keys())
+        avg_times = [np.mean(data[tech][p]) for p in procs]
+        std_times = [np.std(data[tech][p]) for p in procs]
+        min_times = [np.min(data[tech][p]) for p in procs]
+        max_times = [np.max(data[tech][p]) for p in procs]
+        
+        stats[tech] = {
+            'procs': procs,
+            'avg_times': avg_times,
+            'std_times': std_times,
+            'min_times': min_times,
+            'max_times': max_times
+        }
+    
+    return stats
 
 
-def plot_results(procs, avg_times, min_times, max_times):
-    procs = np.array(procs)
-    avg_times = np.array(avg_times)
-    min_times = np.array(min_times)
-    max_times = np.array(max_times)
-
-    base_proc = min(procs)
-    base_idx = np.where(procs == base_proc)[0][0]
-    base_time = avg_times[base_idx]
-
-    speedup = base_time / avg_times
-    efficiency = speedup / procs
-
+def plot_results(stats):
     os.makedirs('results', exist_ok=True)
-
+    и
     plt.figure(figsize=(15, 5))
-
-
+    
     plt.subplot(1, 3, 1)
-    error_lower = avg_times - min_times
-    error_upper = max_times - avg_times
-    plt.errorbar(procs, avg_times, yerr=[error_lower, error_upper], fmt='-o', capsize=5)
-    plt.xlabel('Number of processes')
+    for tech in stats:
+        procs = np.array(stats[tech]['procs'])
+        avg_times = np.array(stats[tech]['avg_times'])
+        min_times = np.array(stats[tech]['min_times'])
+        max_times = np.array(stats[tech]['max_times'])
+        
+        error_lower = avg_times - min_times
+        error_upper = max_times - avg_times
+        
+        plt.errorbar(procs, avg_times, yerr=[error_lower, error_upper], 
+                    fmt='-o', capsize=5, label=tech)
+    
+    plt.xlabel('Number of processes/threads')
     plt.ylabel('Execution time (s)')
-    plt.title(f'Execution Time vs Number of Processes\n(Baseline: {base_proc} process(es))')
-    plt.grid(True)
-
-    plt.subplot(1, 3, 2)
-    plt.plot(procs, speedup, 'b-o', label='Actual speedup')
-    plt.plot(procs, procs, 'r--', label='Linear speedup')
-    plt.xlabel('Number of processes')
-    plt.ylabel('Speedup (T1 / Tp)')
-    plt.title('Speedup')
+    plt.title('Execution Time vs Number of Processes/Threads')
     plt.legend()
     plt.grid(True)
 
-    plt.subplot(1, 3, 3)
-    plt.plot(procs, efficiency, 'g-o')
-    plt.xlabel('Number of processes')
-    plt.ylabel('Efficiency (S/p)')
-    plt.title('Efficiency')
+    plt.subplot(1, 3, 2)
+    for tech in stats:
+        procs = np.array(stats[tech]['procs'])
+        avg_times = np.array(stats[tech]['avg_times'])
+        
+        base_time = avg_times[0]
+        speedup = base_time / avg_times
+        
+        plt.plot(procs, speedup, '-o', label=f'{tech} speedup')
+    
+    plt.plot(procs, procs, 'r--', label='Linear speedup')
+    plt.xlabel('Number of processes/threads')
+    plt.ylabel('Speedup (T1 / Tp)')
+    plt.title('Speedup Comparison')
+    plt.legend()
     plt.grid(True)
-
+    
+    plt.subplot(1, 3, 3)
+    for tech in stats:
+        procs = np.array(stats[tech]['procs'])
+        avg_times = np.array(stats[tech]['avg_times'])
+        
+        base_time = avg_times[0]
+        speedup = base_time / avg_times
+        efficiency = speedup / procs
+        
+        plt.plot(procs, efficiency, '-o', label=f'{tech} efficiency')
+    
+    plt.xlabel('Number of processes/threads')
+    plt.ylabel('Efficiency (S/p)')
+    plt.title('Efficiency Comparison')
+    plt.legend()
+    plt.grid(True)
+    
     plt.tight_layout()
-    plt.savefig('results/parallel_performance.png')
+    plt.savefig('results/parallel_performance_comparison.png')
     plt.show()
 
-    return speedup, efficiency
 
-
-def save_to_excel(procs, avg_times, std_times, min_times, max_times, speedup, efficiency):
-    df = pd.DataFrame({
-        'Processes': procs,
-        'Avg Time (s)': avg_times,
-        'Std Time (s)': std_times,
-        'Min Time (s)': min_times,
-        'Max Time (s)': max_times,
-        'Speedup': speedup,
-        'Efficiency': efficiency
-    })
-    df.to_excel('results/metrics.xlsx', index=False)
-    print("Excel файл сохранен в results/metrics.xlsx")
+def save_to_excel(stats):
+    all_data = []
+    
+    for tech in stats:
+        for i, p in enumerate(stats[tech]['procs']):
+            base_time = stats[tech]['avg_times'][0]
+            speedup = base_time / stats[tech]['avg_times'][i]
+            efficiency = speedup / p
+            
+            all_data.append({
+                'Technology': tech,
+                'Processes/Threads': p,
+                'Avg Time (s)': stats[tech]['avg_times'][i],
+                'Std Time (s)': stats[tech]['std_times'][i],
+                'Min Time (s)': stats[tech]['min_times'][i],
+                'Max Time (s)': stats[tech]['max_times'][i],
+                'Speedup': speedup,
+                'Efficiency': efficiency
+            })
+    
+    df = pd.DataFrame(all_data)
+    df.to_excel('results/metrics_comparison.xlsx', index=False)
+    print("Excel файл сохранен в results/metrics_comparison.xlsx")
 
 
 def main():
@@ -116,16 +164,18 @@ def main():
         print("No valid data found in output files.")
         return
 
-    procs, avg_times, std_times, min_times, max_times = calculate_stats(data)
+    stats = calculate_stats(data)
 
     print("Collected data:")
-    for i, p in enumerate(procs):
-        print(f"Processes: {p}, Runs: {len(data[p])}, "
-              f"Avg: {avg_times[i]:.4f} ± {std_times[i]:.4f}, "
-              f"Min: {min_times[i]:.4f}, Max: {max_times[i]:.4f}")
+    for tech in stats:
+        print(f"\nTechnology: {tech}")
+        for i, p in enumerate(stats[tech]['procs']):
+            print(f"Processes/Threads: {p}, Runs: {len(data[tech][p])}, "
+                  f"Avg: {stats[tech]['avg_times'][i]:.4f} ± {stats[tech]['std_times'][i]:.4f}, "
+                  f"Min: {stats[tech]['min_times'][i]:.4f}, Max: {stats[tech]['max_times'][i]:.4f}")
 
-    speedup, efficiency = plot_results(procs, avg_times, std_times, min_times, max_times)
-    save_to_excel(procs, avg_times, std_times, min_times, max_times, speedup, efficiency)
+    plot_results(stats)
+    save_to_excel(stats)
 
 
 if __name__ == '__main__':
