@@ -32,10 +32,10 @@ run_mpi_jobs() {
 
             if [ "$procs" -le 2 ]; then
                 WALLTIME="00:05"
-                MEM="512MB"
+                MEM="2GB"
             elif [ "$procs" -le 8 ]; then
                 WALLTIME="00:10"
-                MEM="1GB"
+                MEM="2GB"
             else
                 WALLTIME="00:20"
                 MEM="2GB"
@@ -67,10 +67,10 @@ run_omp_jobs() {
 
             if [ "$threads" -le 2 ]; then
                 WALLTIME="01:00"
-                MEM="512MB"
+                MEM="2GB"
             elif [ "$threads" -le 8 ]; then
                 WALLTIME="02:10"
-                MEM="1GB"
+                MEM="2GB"
             else
                 WALLTIME="03:20"
                 MEM="2GB"

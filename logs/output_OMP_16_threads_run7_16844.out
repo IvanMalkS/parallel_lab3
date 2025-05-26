@@ -1,0 +1,66 @@
+Sender: LSF System <lsfadmin@node3.kepler.hpc.local>
+Subject: Job 16844: <OMP_16_threads_run7> in cluster <kepler.lsf.hpc.local> Done
+
+Job <OMP_16_threads_run7> was submitted from host <mgr.kepler.hpc.local> by user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Mon May 26 08:55:00 2025
+Job was executed on host(s) <node3.kepler.hpc.local>, in queue <normal>, as user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Mon May 26 09:24:55 2025
+</home/malkovsin.gmail.com> was used as the home directory.
+</home/malkovsin.gmail.com/Documents/newlab3> was used as the working directory.
+Started at Mon May 26 09:24:55 2025
+Terminated at Mon May 26 09:25:11 2025
+Results reported at Mon May 26 09:25:11 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J OMP_16_threads_run7
+#BSUB -W 03:20
+#BSUB -n 1
+#BSUB -o logs/output_OMP_16_threads_run7_%J.out
+#BSUB -e logs/error_OMP_16_threads_run7_%J.err
+#BSUB -M 2GB
+
+export OMP_NUM_THREADS=16
+./exp_omp
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   6.42 sec.
+    Max Memory :                                 8 MB
+    Average Memory :                             5.50 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                20
+    Run time :                                   10 sec.
+    Turnaround time :                            1811 sec.
+
+The output (if any) follows:
+
+Matrix size: 3x3
+Number of terms: 50000000 (+ Identity)
+Number of threads: 16
+Matrix: A (Initial) (3x3)
+Matrix: A (3x3)
+[   0.1000   0.4000   0.2000 ]
+[   0.3000   0.0000   0.5000 ]
+[   0.6000   0.2000   0.1000 ]
+Calculation finished.
+Execution time: 4.005972 seconds
+Matrix: e^A (Result) (3x3)
+Matrix: e^A (3x3)
+[   1.2646   0.4701   0.3456 ]
+[   0.5019   1.1415   0.5932 ]
+[   0.7383   0.3567   1.2535 ]
+
+
+PS:
+
+Read file <logs/error_OMP_16_threads_run7_16844.err> for stderr output of this job.
+

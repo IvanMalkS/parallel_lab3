@@ -1,147 +1,189 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <omp.h>
 
-#define N 3
-#define TERMS 50000000
 
-double** create_matrix() {
-    double** matrix = (double**)malloc(N * sizeof(double*));
-    if (matrix == NULL) {
-        perror("malloc failed");
-        exit(EXIT_FAILURE);
+#define SIZE 3       
+#define N_TERMS 50000000 
+
+typedef struct {
+    double data[SIZE][SIZE];
+} Matrix;
+
+void MatrixPrint(const char* label, const double matrix[SIZE][SIZE]);
+Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
+                 const double matrix2[SIZE][SIZE]);
+Matrix MatrixMultiply(const double matrix1[SIZE][SIZE],
+                      const double matrix2[SIZE][SIZE]);
+void MatrixIdentity(double matrix[SIZE][SIZE]);
+Matrix MatrixScalarMultiply(const double matrix[SIZE][SIZE],
+                            const double scalar);
+void CalculateTaylorSum(const double A[SIZE][SIZE],
+                        double taylor_sum[SIZE][SIZE], int num_threads);
+void InitializeMatrix(double matrix[SIZE][SIZE], double value);
+
+int main(int argc, char* argv[]) {
+    double A[SIZE][SIZE] = {
+        {0.1, 0.4, 0.2}, {0.3, 0.0, 0.5}, {0.6, 0.2, 0.1}};
+    double taylor_sum[SIZE][SIZE];
+    double start_time, end_time, elapsed_time;
+    int num_threads;
+
+    if (argc > 1) {
+        num_threads = atoi(argv[1]);
+    } else {
+        num_threads = omp_get_max_threads();
     }
-    double* data = (double*)malloc(N * N * sizeof(double));
-    if (data == NULL) {
-        perror("malloc failed");
-        free(matrix);
-        exit(EXIT_FAILURE);
-    }
-    for (int i = 0; i < N; i++) {
-        matrix[i] = &data[i * N];
-    }
-    return matrix;
-}
 
-void free_matrix(double** matrix) {
-    if (matrix != NULL) {
-        free(matrix[0]);
-        free(matrix);
-    }
-}
+    omp_set_num_threads(num_threads);
 
-void print_matrix(const char* name, double** matrix) {
-    printf("Matrix: %s (%dx%d)\n", name, N, N);
-    for (int i = 0; i < N; i++) {
-        printf("  [");
-        for (int j = 0; j < N; j++) {
-            printf("%8.4f%s", matrix[i][j], (j == N - 1) ? "" : " ");
-        }
-        printf(" ]\n");
-    }
-    printf("\n");
-}
+    InitializeMatrix(taylor_sum, 0.0);
 
-void matrix_multiply(double** A, double** B, double** C) {
-    #pragma omp simd collapse(2)
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            double sum = 0.0;
-            for (int k = 0; k < N; k++) {
-                sum += A[i][k] * B[k][j];
-            }
-            C[i][j] = sum;
-        }
-    }
-}
-
-int main() {
-    double start_time, end_time;
-
-    double** A = create_matrix();
-    double** global_term = create_matrix();
-    double** result = create_matrix();
-
-    A[0][0] = 0.1; A[0][1] = 0.4; A[0][2] = 0.2;
-    A[1][0] = 0.3; A[1][1] = 0.0; A[1][2] = 0.5;
-    A[2][0] = 0.6; A[2][1] = 0.2; A[2][2] = 0.1;
-
-    printf("Matrix size: %dx%d\n", N, N);
-    printf("Number of terms: %d (+ Identity)\n", TERMS);
-    printf("Number of threads: %d\n", omp_get_max_threads());
-    print_matrix("A (Initial)", A);
-
-    printf("Starting calculation...\n");
     start_time = omp_get_wtime();
 
-    #pragma omp parallel
-    {
-        double** local_term = create_matrix();
-        double** temp = create_matrix();
-        double** thread_result = create_matrix();
+    CalculateTaylorSum(A, taylor_sum, num_threads);
 
-        #pragma omp single
-        {
-            for (int i = 0; i < N; i++) {
-                for (int j = 0; j < N; j++) {
-                    global_term[i][j] = (i == j) ? 1.0 : 0.0;
-                    result[i][j] = (i == j) ? 1.0 : 0.0;
-                    thread_result[i][j] = 0.0;
-                }
+    end_time = omp_get_wtime();
+
+    double identity[SIZE][SIZE];
+    MatrixIdentity(identity);
+    Matrix final_sum_struct = MatrixAdd(taylor_sum, identity);
+    for (int r = 0; r < SIZE; ++r) {
+        for (int c = 0; c < SIZE; ++c) {
+            taylor_sum[r][c] = final_sum_struct.data[r][c];
+        }
+    }
+
+    elapsed_time = end_time - start_time;
+
+    printf("Matrix size: %dx%d\n", SIZE, SIZE);
+    printf("Number of terms: %d (+ Identity)\n", N_TERMS);
+    printf("Number of threads: %d\n", num_threads);
+
+    printf("Matrix: A (Initial) (%dx%d)\n", SIZE, SIZE);
+    MatrixPrint("A", A);
+
+    printf("Calculation finished.\n");
+    printf("Execution time: %f seconds\n", elapsed_time);
+
+    printf("Matrix: e^A (Result) (%dx%d)\n", SIZE, SIZE);
+    MatrixPrint("e^A", taylor_sum);
+
+    return 0;
+}
+
+void MatrixPrint(const char* label, const double matrix[SIZE][SIZE]) {
+    if (label != NULL && label[0] != '\0') {
+        printf("Matrix: %s (%dx%d)\n", label, SIZE, SIZE);
+    }
+    for (int i = 0; i < SIZE; i++) {
+        printf("[ ");
+        for (int j = 0; j < SIZE; j++) {
+            printf("%8.4f ", matrix[i][j]);
+        }
+        printf("]\n");
+    }
+}
+
+Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
+                 const double matrix2[SIZE][SIZE]) {
+    Matrix result;
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            result.data[i][j] = matrix1[i][j] + matrix2[i][j];
+        }
+    }
+    return result;
+}
+
+Matrix MatrixMultiply(const double matrix1[SIZE][SIZE],
+                      const double matrix2[SIZE][SIZE]) {
+    Matrix result;
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            result.data[i][j] = 0.0;
+            for (int k = 0; k < SIZE; k++) {
+                result.data[i][j] += matrix1[i][k] * matrix2[k][j];
             }
         }
+    }
+    return result;
+}
 
-        #pragma omp barrier
+void MatrixIdentity(double matrix[SIZE][SIZE]) {
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            matrix[i][j] = (i == j) ? 1.0 : 0.0;
+        }
+    }
+}
 
-        #pragma omp for schedule(static)
-        for (int k = 1; k <= TERMS; k++) {
-            if (k == 1) {
-                matrix_multiply(global_term, A, temp);
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        local_term[i][j] = temp[i][j] / k;
-                    }
+Matrix MatrixScalarMultiply(const double matrix[SIZE][SIZE],
+                            const double scalar) {
+    Matrix result;
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            result.data[i][j] = matrix[i][j] * scalar;
+        }
+    }
+    return result;
+}
+
+void CalculateTaylorSum(const double A[SIZE][SIZE],
+                        double taylor_sum[SIZE][SIZE], int num_threads) {
+    double current_term[SIZE][SIZE];
+    double temp_matrix[SIZE][SIZE];
+    InitializeMatrix(taylor_sum, 0.0);
+    MatrixIdentity(current_term);      
+
+    #pragma omp parallel num_threads(num_threads) default(none) shared(A, taylor_sum, current_term, temp_matrix, num_threads)
+    {
+        double local_sum[SIZE][SIZE];
+        InitializeMatrix(local_sum, 0.0);
+
+        #pragma omp for schedule(dynamic)
+        for (long k = 1; k <= N_TERMS; ++k) {
+            Matrix term_A_prod_struct = MatrixMultiply(current_term, A);
+            for (int r = 0; r < SIZE; ++r) {
+                for (int c = 0; c < SIZE; ++c) {
+                    temp_matrix[r][c] = term_A_prod_struct.data[r][c];
                 }
-            } else {
-                matrix_multiply(local_term, A, temp);
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        local_term[i][j] = temp[i][j] / k;
-                    }
+            }
+            Matrix actual_term_k_struct =
+                MatrixScalarMultiply(temp_matrix, 1.0 / (double)k);
+            Matrix new_sum_struct = MatrixAdd(local_sum, actual_term_k_struct.data);
+             for (int r = 0; r < SIZE; ++r) {
+                for (int c = 0; c < SIZE; ++c) {
+                    local_sum[r][c] = new_sum_struct.data[r][c];
                 }
             }
 
-            #pragma omp simd collapse(2)
-            for (int i = 0; i < N; i++) {
-                for (int j = 0; j < N; j++) {
-                    thread_result[i][j] += local_term[i][j];
+            for (int r = 0; r < SIZE; ++r) {
+                for (int c = 0; c < SIZE; ++c) {
+                    current_term[r][c] = actual_term_k_struct.data[r][c];
                 }
             }
+
         }
 
         #pragma omp critical
         {
-            #pragma omp simd collapse(2)
-            for (int i = 0; i < N; i++) {
-                for (int j = 0; j < N; j++) {
-                    result[i][j] += thread_result[i][j];
+           Matrix overall_sum_struct = MatrixAdd(taylor_sum, local_sum);
+            for (int r = 0; r < SIZE; ++r) {
+                for (int c = 0; c < SIZE; ++c) {
+                   taylor_sum[r][c] = overall_sum_struct.data[r][c];
                 }
             }
         }
-
-        free_matrix(local_term);
-        free_matrix(temp);
-        free_matrix(thread_result);
     }
+}
 
-    end_time = omp_get_wtime();
-
-    printf("Calculation finished.\n");
-    printf("Execution time: %.6f seconds\n", end_time - start_time);
-    print_matrix("e^A (Result)", result);
-
-    free_matrix(A);
-    free_matrix(global_term);
-    free_matrix(result);
-    return 0;
+void InitializeMatrix(double matrix[SIZE][SIZE], double value) {
+    for (int i = 0; i < SIZE; ++i) {
+        for (int j = 0; j < SIZE; ++j) {
+            matrix[i][j] = value;
+        }
+    }
 }

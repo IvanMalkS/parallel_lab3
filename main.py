@@ -71,11 +71,12 @@ def calculate_stats(data):
 
 def plot_results(stats):
     os.makedirs('results', exist_ok=True)
-    и
-    plt.figure(figsize=(15, 5))
     
-    plt.subplot(1, 3, 1)
     for tech in stats:
+        plt.figure(figsize=(15, 5))
+        
+        # Subplot 1: Execution time
+        plt.subplot(1, 3, 1)
         procs = np.array(stats[tech]['procs'])
         avg_times = np.array(stats[tech]['avg_times'])
         min_times = np.array(stats[tech]['min_times'])
@@ -85,51 +86,38 @@ def plot_results(stats):
         error_upper = max_times - avg_times
         
         plt.errorbar(procs, avg_times, yerr=[error_lower, error_upper], 
-                    fmt='-o', capsize=5, label=tech)
-    
-    plt.xlabel('Number of processes/threads')
-    plt.ylabel('Execution time (s)')
-    plt.title('Execution Time vs Number of Processes/Threads')
-    plt.legend()
-    plt.grid(True)
+                    fmt='-o', capsize=5, color='blue')
+        plt.xlabel('Number of processes/threads')
+        plt.ylabel('Execution time (s)')
+        plt.title(f'{tech} Execution Time')
+        plt.grid(True)
 
-    plt.subplot(1, 3, 2)
-    for tech in stats:
-        procs = np.array(stats[tech]['procs'])
-        avg_times = np.array(stats[tech]['avg_times'])
-        
+        # Subplot 2: Speedup
+        plt.subplot(1, 3, 2)
         base_time = avg_times[0]
         speedup = base_time / avg_times
         
-        plt.plot(procs, speedup, '-o', label=f'{tech} speedup')
-    
-    plt.plot(procs, procs, 'r--', label='Linear speedup')
-    plt.xlabel('Number of processes/threads')
-    plt.ylabel('Speedup (T1 / Tp)')
-    plt.title('Speedup Comparison')
-    plt.legend()
-    plt.grid(True)
-    
-    plt.subplot(1, 3, 3)
-    for tech in stats:
-        procs = np.array(stats[tech]['procs'])
-        avg_times = np.array(stats[tech]['avg_times'])
+        plt.plot(procs, speedup, '-o', color='green', label='Actual speedup')
+        plt.plot(procs, procs, 'r--', label='Linear speedup')
+        plt.xlabel('Number of processes/threads')
+        plt.ylabel('Speedup (T1 / Tp)')
+        plt.title(f'{tech} Speedup')
+        plt.legend()
+        plt.grid(True)
         
-        base_time = avg_times[0]
-        speedup = base_time / avg_times
+        # Subplot 3: Efficiency
+        plt.subplot(1, 3, 3)
         efficiency = speedup / procs
         
-        plt.plot(procs, efficiency, '-o', label=f'{tech} efficiency')
-    
-    plt.xlabel('Number of processes/threads')
-    plt.ylabel('Efficiency (S/p)')
-    plt.title('Efficiency Comparison')
-    plt.legend()
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.savefig('results/parallel_performance_comparison.png')
-    plt.show()
+        plt.plot(procs, efficiency, '-o', color='purple')
+        plt.xlabel('Number of processes/threads')
+        plt.ylabel('Efficiency (S/p)')
+        plt.title(f'{tech} Efficiency')
+        plt.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(f'results/{tech}_performance.png')
+        plt.show()
 
 
 def save_to_excel(stats):

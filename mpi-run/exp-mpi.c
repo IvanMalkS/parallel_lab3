@@ -1,184 +1,218 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
 #include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
-#define N 3
-#define TERMS 50000000
 
-double** create_matrix(int n) {
-    double** matrix = (double**)malloc(n * sizeof(double*));
-    if (matrix == NULL) {
-        perror("Failed to allocate memory for matrix rows");
-        return NULL;
-    }
-    matrix[0] = (double*)malloc((long long)n * n * sizeof(double));
-    if (matrix[0] == NULL) {
-        perror("Failed to allocate memory for matrix data");
-        free(matrix);
-        return NULL;
-    }
-    for (int i = 1; i < n; i++) {
-        matrix[i] = matrix[0] + (long long)i * n;
-    }
-    return matrix;
-}
+#define SIZE 3 
+#define N_TERMS 50000000 
 
-void free_matrix(double** matrix, int n) {
-    if (matrix != NULL) {
-        if (matrix[0] != NULL) {
-            free(matrix[0]);
+typedef struct {
+    double data[SIZE][SIZE];
+} Matrix;
+
+
+void MatrixPrint(const char* label, const double matrix[SIZE][SIZE]);
+Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
+                 const double matrix2[SIZE][SIZE]);
+Matrix MatrixMultiply(const double matrix1[SIZE][SIZE],
+                      const double matrix2[SIZE][SIZE]);
+void MatrixIdentity(double matrix[SIZE][SIZE]);
+Matrix MatrixScalarMultiply(const double matrix[SIZE][SIZE],
+                            const double scalar);
+void MatrixSumMpiOp(void* invec, void* inoutvec, int* len,
+                    MPI_Datatype* datatype);
+void CalculateTaylorSum(const double A[SIZE][SIZE],
+                        double local_taylor_sum[SIZE][SIZE], int rank,
+                        int num_procs);
+void InitializeMatrix(double matrix[SIZE][SIZE], double value);
+int main(int argc, char* argv[]) {
+    int rank, num_procs;
+    double A[SIZE][SIZE] = {
+        {0.1, 0.4, 0.2}, {0.3, 0.0, 0.5}, {0.6, 0.2, 0.1}};
+    double global_taylor_sum[SIZE][SIZE];
+    double start_time, end_time, elapsed_time;
+
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
+    InitializeMatrix(global_taylor_sum, 0.0);
+
+    start_time = MPI_Wtime();
+
+    double local_taylor_sum[SIZE][SIZE];
+    CalculateTaylorSum(A, local_taylor_sum, rank, num_procs);
+
+    MPI_Op matrix_sum_op;
+    MPI_Op_create(MatrixSumMpiOp, 1, &matrix_sum_op);
+
+    MPI_Reduce(local_taylor_sum, global_taylor_sum, SIZE * SIZE, MPI_DOUBLE,
+               matrix_sum_op, 0, MPI_COMM_WORLD);
+
+    MPI_Op_free(&matrix_sum_op);
+
+    end_time = MPI_Wtime();
+
+    if (rank == 0) {
+        double identity[SIZE][SIZE];
+        MatrixIdentity(identity);
+        Matrix final_sum_struct = MatrixAdd(global_taylor_sum, identity);
+        for (int r = 0; r < SIZE; ++r) {
+            for (int c = 0; c < SIZE; ++c) {
+                global_taylor_sum[r][c] = final_sum_struct.data[r][c];
+            }
         }
-        free(matrix);
     }
+
+    elapsed_time = end_time - start_time;
+
+    if (rank == 0) {
+        printf("Matrix size: %dx%d\n", SIZE, SIZE);
+        printf("Number of terms: %d (+ Identity)\n", N_TERMS);
+        printf("Number of threads: %d\n", num_procs);
+
+        printf("Matrix: A (Initial) (%dx%d)\n", SIZE, SIZE);
+        MatrixPrint("A", A);
+
+        printf("Calculation finished.\n");
+        printf("Execution time: %f seconds\n", elapsed_time);
+
+        printf("Matrix: e^A (Result) (%dx%d)\n", SIZE, SIZE);
+        MatrixPrint("e^A", global_taylor_sum);
+    }
+
+    MPI_Finalize();
+    return 0;
 }
 
-
-void print_matrix(const char* name, double** matrix, int n) {
-    printf("Matrix: %s (%dx%d)\n", name, n, n);
-    for (int i = 0; i < n; i++) {
-        printf("  [");
-        for (int j = 0; j < n; j++) {
-            printf("%8.4f%s", matrix[i][j], (j == n - 1) ? "" : " ");
+void MatrixPrint(const char* label, const double matrix[SIZE][SIZE]) {
+    if (label != NULL && label[0] != '\0') {
+        printf("Matrix: %s (%dx%d)\n", label, SIZE, SIZE);
+    }
+    for (int i = 0; i < SIZE; i++) {
+        printf("[ ");
+        for (int j = 0; j < SIZE; j++) {
+            printf("%8.4f ", matrix[i][j]);
         }
-        printf(" ]\n");
+        printf("]\n");
     }
-    printf("\n");
 }
 
+Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
+                 const double matrix2[SIZE][SIZE]) {
+    Matrix result;
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            result.data[i][j] = matrix1[i][j] + matrix2[i][j];
+        }
+    }
+    return result;
+}
 
-void init_identity(double** matrix, int n) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
+Matrix MatrixMultiply(const double matrix1[SIZE][SIZE],
+                      const double matrix2[SIZE][SIZE]) {
+    Matrix result;
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            result.data[i][j] = 0.0;
+            for (int k = 0; k < SIZE; k++) {
+                result.data[i][j] += matrix1[i][k] * matrix2[k][j];
+            }
+        }
+    }
+    return result;
+}
+
+void MatrixIdentity(double matrix[SIZE][SIZE]) {
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
             matrix[i][j] = (i == j) ? 1.0 : 0.0;
         }
     }
 }
 
-void zero_matrix(double** matrix, int n) {
-     for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            matrix[i][j] = 0.0;
+Matrix MatrixScalarMultiply(const double matrix[SIZE][SIZE],
+                            const double scalar) {
+    Matrix result;
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            result.data[i][j] = matrix[i][j] * scalar;
+        }
+    }
+    return result;
+}
+
+void MatrixSumMpiOp(void* invec, void* inoutvec, int* len,
+                    MPI_Datatype* datatype) {
+    double(*in_matrix)[SIZE] = (double(*)[SIZE])invec;
+    double(*inout_matrix)[SIZE] = (double(*)[SIZE])inoutvec;
+    if (*len != SIZE * SIZE) {
+        fprintf(stderr, "Error in matrix_sum_mpi_op: len mismatch!\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            inout_matrix[i][j] += in_matrix[i][j];
         }
     }
 }
 
-void matrix_multiply(double** A, double** B, double** C, int n) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            C[i][j] = 0.0;
-            for (int k = 0; k < n; k++) {
-                C[i][j] += A[i][k] * B[k][j];
+void CalculateTaylorSum(const double A[SIZE][SIZE],
+                        double local_taylor_sum[SIZE][SIZE], int rank,
+                        int num_procs) {
+    double current_term[SIZE][SIZE];
+    double temp_matrix[SIZE][SIZE];
+
+
+    InitializeMatrix(local_taylor_sum, 0.0);
+    MatrixIdentity(current_term);
+
+    long k_start_idx, k_end_idx;
+    long num_my_terms;
+
+    long base_count = N_TERMS / num_procs;
+    long extra_count = N_TERMS % num_procs;
+
+    if (rank < extra_count) {
+        k_start_idx = rank * (base_count + 1) + 1;
+        num_my_terms = base_count + 1;
+    } else {
+        k_start_idx = rank * base_count + extra_count + 1;
+        num_my_terms = base_count;
+    }
+    k_end_idx = k_start_idx + num_my_terms - 1;
+
+    for (long k = k_start_idx; k <= k_end_idx; ++k) {
+        Matrix term_A_prod_struct = MatrixMultiply(current_term, A);
+        for (int r = 0; r < SIZE; ++r) {
+            for (int c = 0; c < SIZE; ++c) {
+                temp_matrix[r][c] = term_A_prod_struct.data[r][c];
+            }
+        }
+        Matrix actual_term_k_struct =
+            MatrixScalarMultiply(temp_matrix, 1.0 / (double)k);
+        Matrix new_sum_struct = MatrixAdd(local_taylor_sum, actual_term_k_struct.data);
+        for (int r = 0; r < SIZE; ++r) {
+            for (int c = 0; c < SIZE; ++c) {
+                local_taylor_sum[r][c] = new_sum_struct.data[r][c];
+            }
+        }
+        for (int r = 0; r < SIZE; ++r) {
+            for (int c = 0; c < SIZE; ++c) {
+                current_term[r][c] = actual_term_k_struct.data[r][c];
             }
         }
     }
 }
 
-void matrix_add(double** A, double** B, double** C, int n) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            C[i][j] = A[i][j] + B[i][j];
+void InitializeMatrix(double matrix[SIZE][SIZE], double value) {
+    for (int i = 0; i < SIZE; ++i) {
+        for (int j = 0; j < SIZE; ++j) {
+            matrix[i][j] = value;
         }
     }
-}
-
-void matrix_copy(double** A, double** B, int n) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            B[i][j] = A[i][j];
-        }
-    }
-}
-
-void matrix_scale(double** A, double scalar, int n) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            A[i][j] *= scalar;
-        }
-    }
-}
-
-int main(int argc, char** argv) {
-    MPI_Init(&argc, &argv);
-
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    double** A           = create_matrix(N);
-    double** term        = create_matrix(N);
-    double** next_term   = create_matrix(N);
-    double** temp_mult   = create_matrix(N);
-    double** result      = create_matrix(N);
-    double** partial_sum = create_matrix(N);
-
-    if (!A || !term || !next_term || !temp_mult || !result || !partial_sum) {
-         fprintf(stderr, "[Rank %d] Ошибка выделения памяти для матриц!\n", rank);
-         MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-    if (rank == 0) {
-        printf("Matrix size: %dx%d\n", N, N);
-        printf("Number of terms: %d (+ Identity)\n", TERMS);
-        printf("Number of processes: %d\n", size);
-
-        A[0][0] = 0.1; A[0][1] = 0.4; A[0][2] = 0.2;
-        A[1][0] = 0.3; A[1][1] = 0.0; A[1][2] = 0.5;
-        A[2][0] = 0.6; A[2][1] = 0.2; A[2][2] = 0.1;
-
-        print_matrix("A (Initial)", A, N);
-        printf("Starting calculation...\n");
-    }
-
-    MPI_Bcast(A[0], N * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-    zero_matrix(partial_sum, N);
-    init_identity(term, N);
-
-    if (0 % size == rank) {
-        matrix_add(partial_sum, term, partial_sum, N);
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    double start_time = MPI_Wtime();
-
-
-    for (int k = 1; k <= TERMS; k++) {
-        matrix_multiply(term, A, temp_mult, N);
-        matrix_copy(temp_mult, next_term, N);
-        matrix_scale(next_term, 1.0 / (double)k, N);
-        matrix_copy(next_term, term, N);
-
-        if (k % size == rank) {
-             matrix_add(partial_sum, term, partial_sum, N);
-        }
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    double end_time = MPI_Wtime();
-
-    if (rank == 0) {
-        zero_matrix(result, N);
-    }
-
-    MPI_Reduce(partial_sum[0], result[0], N * N, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    if (rank == 0) {
-        double total_time = end_time - start_time;
-        printf("Calculation finished.\n");
-        printf("Execution time: %.6f seconds\n", total_time);
-
-        print_matrix("e^A (Result)", result, N);
-    }
-
-    free_matrix(A, N);
-    free_matrix(term, N);
-    free_matrix(next_term, N);
-    free_matrix(temp_mult, N);
-    free_matrix(result, N);
-    free_matrix(partial_sum, N);
-
-    MPI_Finalize();
-    return 0;
 }
