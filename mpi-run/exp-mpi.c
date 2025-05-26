@@ -112,17 +112,33 @@ Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
     return result;
 }
 
-Matrix MatrixMultiply(const double matrix1[SIZE][SIZE],
-                      const double matrix2[SIZE][SIZE]) {
+Matrix MatrixMultiply(const double A[SIZE][SIZE], const double B[SIZE][SIZE], int rank, int num_procs) {
     Matrix result;
-    for (int i = 0; i < SIZE; i++) {
+    InitializeMatrix(result.data, 0.0);
+
+    int rows_per_proc = SIZE / num_procs;
+    int extra_rows = SIZE % num_procs;
+    int my_rows = (rank < extra_rows) ? rows_per_proc + 1 : rows_per_proc;
+    int my_start_row = (rank < extra_rows) 
+                       ? rank * (rows_per_proc + 1) 
+                       : extra_rows * (rows_per_proc + 1) + (rank - extra_rows) * rows_per_proc;
+
+    for (int i = my_start_row; i < my_start_row + my_rows; i++) {
         for (int j = 0; j < SIZE; j++) {
-            result.data[i][j] = 0.0;
             for (int k = 0; k < SIZE; k++) {
-                result.data[i][j] += matrix1[i][k] * matrix2[k][j];
+                result.data[i][j] += A[i][k] * B[k][j];
             }
         }
     }
+
+    MPI_Reduce(rank == 0 ? MPI_IN_PLACE : result.data, 
+               result.data, 
+               SIZE * SIZE, 
+               MPI_DOUBLE, 
+               MPI_SUM, 
+               0, 
+               MPI_COMM_WORLD);
+
     return result;
 }
 
