@@ -4,18 +4,17 @@
 #include <stdlib.h>
 #include <time.h>
 
-
-#define SIZE 3 
-#define N_TERMS 50000000 
+#define SIZE 3
+#define N_TERMS 5000
 
 typedef struct {
     double data[SIZE][SIZE];
 } Matrix;
 
-
 void MatrixPrint(const char* label, const double matrix[SIZE][SIZE]);
 Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
                  const double matrix2[SIZE][SIZE]);
+
 Matrix MatrixMultiply(const double matrix1[SIZE][SIZE],
                      const double matrix2[SIZE][SIZE],
                      int rank, int num_procs);
@@ -28,13 +27,14 @@ void CalculateTaylorSum(const double A[SIZE][SIZE],
                         double local_taylor_sum[SIZE][SIZE], int rank,
                         int num_procs);
 void InitializeMatrix(double matrix[SIZE][SIZE], double value);
+void MatrixCopy(double dest[SIZE][SIZE], const double src[SIZE][SIZE]);
+
 int main(int argc, char* argv[]) {
     int rank, num_procs;
     double A[SIZE][SIZE] = {
         {0.1, 0.4, 0.2}, {0.3, 0.0, 0.5}, {0.6, 0.2, 0.1}};
     double global_taylor_sum[SIZE][SIZE];
     double start_time, end_time, elapsed_time;
-
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -61,11 +61,7 @@ int main(int argc, char* argv[]) {
         double identity[SIZE][SIZE];
         MatrixIdentity(identity);
         Matrix final_sum_struct = MatrixAdd(global_taylor_sum, identity);
-        for (int r = 0; r < SIZE; ++r) {
-            for (int c = 0; c < SIZE; ++c) {
-                global_taylor_sum[r][c] = final_sum_struct.data[r][c];
-            }
-        }
+        MatrixCopy(global_taylor_sum, final_sum_struct.data);
     }
 
     elapsed_time = end_time - start_time;
@@ -73,7 +69,7 @@ int main(int argc, char* argv[]) {
     if (rank == 0) {
         printf("Matrix size: %dx%d\n", SIZE, SIZE);
         printf("Number of terms: %d (+ Identity)\n", N_TERMS);
-        printf("Number of threads: %d\n", num_procs);
+        printf("Number of processors: %d\n", num_procs);
 
         printf("Matrix: A (Initial) (%dx%d)\n", SIZE, SIZE);
         MatrixPrint("A", A);
@@ -90,9 +86,6 @@ int main(int argc, char* argv[]) {
 }
 
 void MatrixPrint(const char* label, const double matrix[SIZE][SIZE]) {
-    if (label != NULL && label[0] != '\0') {
-        printf("Matrix: %s (%dx%d)\n", label, SIZE, SIZE);
-    }
     for (int i = 0; i < SIZE; i++) {
         printf("[ ");
         for (int j = 0; j < SIZE; j++) {
@@ -114,33 +107,34 @@ Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
 }
 
 Matrix MatrixMultiply(const double A[SIZE][SIZE], const double B[SIZE][SIZE], int rank, int num_procs) {
-    Matrix result;
-    InitializeMatrix(result.data, 0.0);
+    Matrix partial_result;
+    InitializeMatrix(partial_result.data, 0.0);
 
     int rows_per_proc = SIZE / num_procs;
     int extra_rows = SIZE % num_procs;
-    int my_rows = (rank < extra_rows) ? rows_per_proc + 1 : rows_per_proc;
-    int my_start_row = (rank < extra_rows) 
-                       ? rank * (rows_per_proc + 1) 
+    int my_rows_count = (rank < extra_rows) ? rows_per_proc + 1 : rows_per_proc;
+    int my_start_row = (rank < extra_rows)
+                       ? rank * (rows_per_proc + 1)
                        : extra_rows * (rows_per_proc + 1) + (rank - extra_rows) * rows_per_proc;
 
-    for (int i = my_start_row; i < my_start_row + my_rows; i++) {
+    for (int i = my_start_row; i < my_start_row + my_rows_count; i++) {
         for (int j = 0; j < SIZE; j++) {
-            for (int k = 0; k < SIZE; k++) {
-                result.data[i][j] += A[i][k] * B[k][j];
+            for (int k_inner = 0; k_inner < SIZE; k_inner++) {
+                partial_result.data[i][j] += A[i][k_inner] * B[k_inner][j];
             }
         }
     }
 
-    MPI_Reduce(rank == 0 ? MPI_IN_PLACE : result.data, 
-               result.data, 
-               SIZE * SIZE, 
-               MPI_DOUBLE, 
-               MPI_SUM, 
-               0, 
-               MPI_COMM_WORLD);
+    Matrix global_result;
 
-    return result;
+    MPI_Allreduce(partial_result.data,
+                  global_result.data,
+                  SIZE * SIZE,
+                  MPI_DOUBLE,
+                  MPI_SUM,
+                  MPI_COMM_WORLD);
+
+    return global_result;
 }
 
 void MatrixIdentity(double matrix[SIZE][SIZE]) {
@@ -164,16 +158,17 @@ Matrix MatrixScalarMultiply(const double matrix[SIZE][SIZE],
 
 void MatrixSumMpiOp(void* invec, void* inoutvec, int* len,
                     MPI_Datatype* datatype) {
-    double(*in_matrix)[SIZE] = (double(*)[SIZE])invec;
-    double(*inout_matrix)[SIZE] = (double(*)[SIZE])inoutvec;
+    double (*in_matrix_ptr)[SIZE] = (double(*)[SIZE])invec;
+    double (*inout_matrix_ptr)[SIZE] = (double(*)[SIZE])inoutvec;
+
     if (*len != SIZE * SIZE) {
-        fprintf(stderr, "Error in matrix_sum_mpi_op: len mismatch!\n");
+        fprintf(stderr, "Error in MatrixSumMpiOp: len mismatch! Expected %d, got %d\n", SIZE * SIZE, *len);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     for (int i = 0; i < SIZE; i++) {
         for (int j = 0; j < SIZE; j++) {
-            inout_matrix[i][j] += in_matrix[i][j];
+            inout_matrix_ptr[i][j] += in_matrix_ptr[i][j];
         }
     }
 }
@@ -181,47 +176,70 @@ void MatrixSumMpiOp(void* invec, void* inoutvec, int* len,
 void CalculateTaylorSum(const double A[SIZE][SIZE],
                         double local_taylor_sum[SIZE][SIZE], int rank,
                         int num_procs) {
-    double current_term[SIZE][SIZE];
-    double temp_matrix[SIZE][SIZE];
-
-
     InitializeMatrix(local_taylor_sum, 0.0);
-    MatrixIdentity(current_term);
+    Matrix temp_matrix_struct;
 
-    long k_start_idx, k_end_idx;
-    long num_my_terms;
-
-    long base_count = N_TERMS / num_procs;
-    long extra_count = N_TERMS % num_procs;
-
-    if (rank < extra_count) {
-        k_start_idx = rank * (base_count + 1) + 1;
-        num_my_terms = base_count + 1;
-    } else {
-        k_start_idx = rank * base_count + extra_count + 1;
-        num_my_terms = base_count;
+    double A_P[SIZE][SIZE];
+    if (num_procs == 0) {
+        MPI_Abort(MPI_COMM_WORLD, 1);
+        return;
     }
-    k_end_idx = k_start_idx + num_my_terms - 1;
+    if (num_procs == 1) {
+        MatrixCopy(A_P, A);
+    } else {
+        MatrixCopy(A_P, A);
 
-    for (long k = k_start_idx; k <= k_end_idx; ++k) {
-        Matrix term_A_prod_struct = MatrixMultiply(current_term, A, rank, num_procs);
-        for (int r = 0; r < SIZE; ++r) {
-            for (int c = 0; c < SIZE; ++c) {
-                temp_matrix[r][c] = term_A_prod_struct.data[r][c];
-            }
+        for (int i = 1; i < num_procs; ++i) {
+            temp_matrix_struct = MatrixMultiply(A_P, A, rank, num_procs);
+            MatrixCopy(A_P, temp_matrix_struct.data);
         }
-        Matrix actual_term_k_struct =
-            MatrixScalarMultiply(temp_matrix, 1.0 / (double)k);
-        Matrix new_sum_struct = MatrixAdd(local_taylor_sum, actual_term_k_struct.data);
-        for (int r = 0; r < SIZE; ++r) {
-            for (int c = 0; c < SIZE; ++c) {
-                local_taylor_sum[r][c] = new_sum_struct.data[r][c];
-            }
+    }
+
+    double current_term_val[SIZE][SIZE];
+
+    long k_first_for_proc = (long)rank + 1;
+
+    if (k_first_for_proc <= N_TERMS) {
+        double A_power_k_first[SIZE][SIZE];
+        MatrixIdentity(A_power_k_first);
+
+        for (long p = 1; p <= k_first_for_proc; ++p) {
+            temp_matrix_struct = MatrixMultiply(A_power_k_first, A, rank, num_procs);
+            MatrixCopy(A_power_k_first, temp_matrix_struct.data);
         }
-        for (int r = 0; r < SIZE; ++r) {
-            for (int c = 0; c < SIZE; ++c) {
-                current_term[r][c] = actual_term_k_struct.data[r][c];
+
+        double factorial_k_first = 1.0;
+        for (long p = 1; p <= k_first_for_proc; ++p) {
+            if (p > 0) factorial_k_first *= (double)p;
+        }
+         if (k_first_for_proc == 0) factorial_k_first = 1.0;
+
+        temp_matrix_struct = MatrixScalarMultiply(A_power_k_first, 1.0 / factorial_k_first);
+        MatrixCopy(current_term_val, temp_matrix_struct.data);
+
+        Matrix new_sum_struct = MatrixAdd(local_taylor_sum, current_term_val);
+        MatrixCopy(local_taylor_sum, new_sum_struct.data);
+
+        for (long k_current = k_first_for_proc; k_current <= N_TERMS - num_procs; k_current += num_procs) {
+            long k_next = k_current + num_procs;
+
+            temp_matrix_struct = MatrixMultiply(current_term_val, A_P, rank, num_procs);
+            MatrixCopy(current_term_val, temp_matrix_struct.data);
+
+            double product_for_denominator = 1.0;
+            for (long val = k_current + 1; val <= k_next; ++val) {
+                 if (val > 0) product_for_denominator *= (double)val;
             }
+            if (product_for_denominator == 0) {
+                 fprintf(stderr, "Rank %d: product_for_denominator is zero at k_current=%ld, k_next=%ld\n", rank, k_current, k_next);
+                 MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+
+            temp_matrix_struct = MatrixScalarMultiply(current_term_val, 1.0 / product_for_denominator);
+            MatrixCopy(current_term_val, temp_matrix_struct.data);
+
+            new_sum_struct = MatrixAdd(local_taylor_sum, current_term_val);
+            MatrixCopy(local_taylor_sum, new_sum_struct.data);
         }
     }
 }
@@ -230,6 +248,14 @@ void InitializeMatrix(double matrix[SIZE][SIZE], double value) {
     for (int i = 0; i < SIZE; ++i) {
         for (int j = 0; j < SIZE; ++j) {
             matrix[i][j] = value;
+        }
+    }
+}
+
+void MatrixCopy(double dest[SIZE][SIZE], const double src[SIZE][SIZE]) {
+    for (int i = 0; i < SIZE; ++i) {
+        for (int j = 0; j < SIZE; ++j) {
+            dest[i][j] = src[i][j];
         }
     }
 }
