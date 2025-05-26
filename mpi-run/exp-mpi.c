@@ -17,7 +17,8 @@ void MatrixPrint(const char* label, const double matrix[SIZE][SIZE]);
 Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
                  const double matrix2[SIZE][SIZE]);
 Matrix MatrixMultiply(const double matrix1[SIZE][SIZE],
-                      const double matrix2[SIZE][SIZE]);
+                     const double matrix2[SIZE][SIZE],
+                     int rank, int num_procs);
 void MatrixIdentity(double matrix[SIZE][SIZE]);
 Matrix MatrixScalarMultiply(const double matrix[SIZE][SIZE],
                             const double scalar);
@@ -203,7 +204,7 @@ void CalculateTaylorSum(const double A[SIZE][SIZE],
     k_end_idx = k_start_idx + num_my_terms - 1;
 
     for (long k = k_start_idx; k <= k_end_idx; ++k) {
-        Matrix term_A_prod_struct = MatrixMultiply(current_term, A);
+        Matrix term_A_prod_struct = MatrixMultiply(current_term, A, rank, num_procs);
         for (int r = 0; r < SIZE; ++r) {
             for (int c = 0; c < SIZE; ++c) {
                 temp_matrix[r][c] = term_A_prod_struct.data[r][c];
