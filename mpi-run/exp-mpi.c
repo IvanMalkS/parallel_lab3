@@ -107,34 +107,17 @@ Matrix MatrixAdd(const double matrix1[SIZE][SIZE],
 }
 
 Matrix MatrixMultiply(const double A[SIZE][SIZE], const double B[SIZE][SIZE], int rank, int num_procs) {
-    Matrix partial_result;
-    InitializeMatrix(partial_result.data, 0.0);
-
-    int rows_per_proc = SIZE / num_procs;
-    int extra_rows = SIZE % num_procs;
-    int my_rows_count = (rank < extra_rows) ? rows_per_proc + 1 : rows_per_proc;
-    int my_start_row = (rank < extra_rows)
-                       ? rank * (rows_per_proc + 1)
-                       : extra_rows * (rows_per_proc + 1) + (rank - extra_rows) * rows_per_proc;
-
-    for (int i = my_start_row; i < my_start_row + my_rows_count; i++) {
+    Matrix result;
+    InitializeMatrix(result.data, 0.0);
+    for (int i = 0; i < SIZE; i++) {
         for (int j = 0; j < SIZE; j++) {
-            for (int k_inner = 0; k_inner < SIZE; k_inner++) {
-                partial_result.data[i][j] += A[i][k_inner] * B[k_inner][j];
+            for (int k = 0; k < SIZE; k++) {
+                result.data[i][j] += A[i][k] * B[k][j];
             }
         }
     }
 
-    Matrix global_result;
-
-    MPI_Allreduce(partial_result.data,
-                  global_result.data,
-                  SIZE * SIZE,
-                  MPI_DOUBLE,
-                  MPI_SUM,
-                  MPI_COMM_WORLD);
-
-    return global_result;
+    return result;
 }
 
 void MatrixIdentity(double matrix[SIZE][SIZE]) {
