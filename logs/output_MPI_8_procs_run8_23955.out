@@ -1,0 +1,21 @@
+Sender: LSF System <lsfadmin@node5.kepler.hpc.local>
+Subject: Job 23955: <MPI_8_procs_run8> in cluster <kepler.lsf.hpc.local> Exited
+
+Job <MPI_8_procs_run8> was submitted from host <mgr.kepler.hpc.local> by user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 19:57:31 2025
+Job was executed on host(s) <8*node5.kepler.hpc.local>, in queue <normal>, as user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 20:03:10 2025
+</home/malkovsin.gmail.com> was used as the home directory.
+</home/malkovsin.gmail.com/Documents/newlab3> was used as the working directory.
+Started at Thu May 29 20:03:10 2025
+Terminated at Thu May 29 20:03:13 2025
+Results reported at Thu May 29 20:03:25 2025
+Cannot open your job file: /home/malkovsin.gmail.com/.lsbatch/1748530651.23955
+TERM_OWNER: job killed by owner.
+Exited.
+
+
+
+PS:
+
+Unable to read output data from the stdout buffer file </home/malkovsin.gmail.com/.lsbatch/1748530651.23955.out>: your job was probably aborted prematurely.
+Unable to read stderr data from stderr buffer file; your job was probably aborted prematurely.
+

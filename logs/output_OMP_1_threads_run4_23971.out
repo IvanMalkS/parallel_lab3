@@ -1,0 +1,40 @@
+Sender: LSF System <lsfadmin@node3.kepler.hpc.local>
+Subject: Job 23971: <OMP_1_threads_run4> in cluster <kepler.lsf.hpc.local> Exited
+
+Job <OMP_1_threads_run4> was submitted from host <mgr.kepler.hpc.local> by user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 19:57:34 2025
+Job was executed on host(s) <node3.kepler.hpc.local>, in queue <normal>, as user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 20:01:58 2025
+</home/malkovsin.gmail.com> was used as the home directory.
+</home/malkovsin.gmail.com/Documents/newlab3> was used as the working directory.
+Started at Thu May 29 20:01:58 2025
+Terminated at Thu May 29 20:03:10 2025
+Results reported at Thu May 29 20:03:25 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J OMP_1_threads_run4
+#BSUB -W 00:05
+#BSUB -n 1
+#BSUB -o logs/output_OMP_1_threads_run4_%J.out
+#BSUB -e logs/error_OMP_1_threads_run4_%J.err
+#BSUB -M 2GB
+
+export OMP_NUM_THREADS=1
+./exp_omp
+
+------------------------------------------------------------
+
+TERM_OWNER: job killed by owner.
+Exited.
+
+
+The output (if any) follows:
+
+
+
+PS:
+
+Read file <logs/error_OMP_1_threads_run4_23971.err> for stderr output of this job.
+

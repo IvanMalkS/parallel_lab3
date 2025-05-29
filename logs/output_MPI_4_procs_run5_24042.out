@@ -1,0 +1,60 @@
+Sender: LSF System <lsfadmin@node3.kepler.hpc.local>
+Subject: Job 24042: <MPI_4_procs_run5> in cluster <kepler.lsf.hpc.local> Done
+
+Job <MPI_4_procs_run5> was submitted from host <mgr.kepler.hpc.local> by user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 20:03:22 2025
+Job was executed on host(s) <4*node3.kepler.hpc.local>, in queue <normal>, as user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 20:03:30 2025
+</home/malkovsin.gmail.com> was used as the home directory.
+</home/malkovsin.gmail.com/Documents/newlab3> was used as the working directory.
+Started at Thu May 29 20:03:30 2025
+Terminated at Thu May 29 20:05:39 2025
+Results reported at Thu May 29 20:05:39 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J MPI_4_procs_run5
+#BSUB -W 00:10
+#BSUB -n 4
+#BSUB -R "span[ptile=4]"
+#BSUB -o logs/output_MPI_4_procs_run5_%J.out
+#BSUB -e logs/error_MPI_4_procs_run5_%J.err
+#BSUB -M 2GB
+
+module load mpi/openmpi-x86_64
+mpirun --bind-to core --map-by core ./exp_mpi
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   245.98 sec.
+    Max Memory :                                 1341 MB
+    Average Memory :                             813.20 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              20
+    Max Threads :                                88
+    Run time :                                   147 sec.
+    Turnaround time :                            137 sec.
+
+The output (if any) follows:
+
+Matrix size: 3x3
+Terms in Taylor series: 500000000 (+ Identity)
+Number of MPI processes: 16
+Execution time: 109.47 seconds
+e^A (approximated)::
+[   1.2638   0.4696   0.3450 ]
+[   0.5010   1.1409   0.5925 ]
+[   0.7374   0.3560   1.2528 ]
+
+
+PS:
+
+Read file <logs/error_MPI_4_procs_run5_24042.err> for stderr output of this job.
+

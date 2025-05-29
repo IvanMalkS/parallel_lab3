@@ -1,0 +1,41 @@
+Sender: LSF System <lsfadmin@node3.kepler.hpc.local>
+Subject: Job 23920: <MPI_1_procs_run3> in cluster <kepler.lsf.hpc.local> Exited
+
+Job <MPI_1_procs_run3> was submitted from host <mgr.kepler.hpc.local> by user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 19:57:23 2025
+Job was executed on host(s) <node3.kepler.hpc.local>, in queue <normal>, as user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 19:59:27 2025
+</home/malkovsin.gmail.com> was used as the home directory.
+</home/malkovsin.gmail.com/Documents/newlab3> was used as the working directory.
+Started at Thu May 29 19:59:27 2025
+Terminated at Thu May 29 20:03:10 2025
+Results reported at Thu May 29 20:03:27 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J MPI_1_procs_run3
+#BSUB -W 00:05
+#BSUB -n 1
+#BSUB -R "span[ptile=1]"
+#BSUB -o logs/output_MPI_1_procs_run3_%J.out
+#BSUB -e logs/error_MPI_1_procs_run3_%J.err
+#BSUB -M 2GB
+
+module load mpi/openmpi-x86_64
+mpirun --bind-to core --map-by core ./exp_mpi
+
+------------------------------------------------------------
+
+TERM_OWNER: job killed by owner.
+Exited.
+
+
+The output (if any) follows:
+
+
+
+PS:
+
+Read file <logs/error_MPI_1_procs_run3_23920.err> for stderr output of this job.
+

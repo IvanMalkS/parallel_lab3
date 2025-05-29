@@ -1,0 +1,60 @@
+Sender: LSF System <lsfadmin@node5.kepler.hpc.local>
+Subject: Job 24064: <MPI_16_procs_run7> in cluster <kepler.lsf.hpc.local> Done
+
+Job <MPI_16_procs_run7> was submitted from host <mgr.kepler.hpc.local> by user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 20:03:27 2025
+Job was executed on host(s) <16*node5.kepler.hpc.local>, in queue <normal>, as user <malkovsin.gmail.com> in cluster <kepler.lsf.hpc.local> at Thu May 29 20:07:53 2025
+</home/malkovsin.gmail.com> was used as the home directory.
+</home/malkovsin.gmail.com/Documents/newlab3> was used as the working directory.
+Started at Thu May 29 20:07:53 2025
+Terminated at Thu May 29 20:08:14 2025
+Results reported at Thu May 29 20:08:14 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J MPI_16_procs_run7
+#BSUB -W 00:20
+#BSUB -n 16
+#BSUB -R "span[ptile=16]"
+#BSUB -o logs/output_MPI_16_procs_run7_%J.out
+#BSUB -e logs/error_MPI_16_procs_run7_%J.err
+#BSUB -M 2GB
+
+module load mpi/openmpi-x86_64
+mpirun --bind-to core --map-by core ./exp_mpi
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   191.85 sec.
+    Max Memory :                                 900 MB
+    Average Memory :                             239.00 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   66 MB
+    Max Processes :                              20
+    Max Threads :                                88
+    Run time :                                   22 sec.
+    Turnaround time :                            287 sec.
+
+The output (if any) follows:
+
+Matrix size: 3x3
+Terms in Taylor series: 500000000 (+ Identity)
+Number of MPI processes: 16
+Execution time: 11.78 seconds
+e^A (approximated)::
+[   1.2638   0.4696   0.3450 ]
+[   0.5010   1.1409   0.5925 ]
+[   0.7374   0.3560   1.2528 ]
+
+
+PS:
+
+Read file <logs/error_MPI_16_procs_run7_24064.err> for stderr output of this job.
+
